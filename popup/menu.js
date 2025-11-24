@@ -72,11 +72,17 @@ async function toggleCurrentSite(folderId, tab) {
 
 // Elements Setup
 
+// Element init
+
 let btn = document.getElementById("button");
-let profileList = document.getElementById("profile");
+let profileList = document.getElementById("profiles");
+
+setButtonState();
+
+// Button update function
 
 async function setButtonState() {
-  let givenProfile = document.getElementById("profiles").value;
+  let givenProfile = profileList.value;
   profileFolderId = await initProfileFolder(givenProfile);
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   profileFolderId = await initProfileFolder(givenProfile);
@@ -88,10 +94,10 @@ async function setButtonState() {
   }
 }
 
-setButtonState();
+// Button click function
 
 btn.addEventListener("click", async function () {
-  let givenProfile = document.getElementById("profiles").value;
+  let givenProfile = profileList.value;
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   profileFolderId = await initProfileFolder(givenProfile);
 
@@ -101,9 +107,13 @@ btn.addEventListener("click", async function () {
   setButtonState();
 });
 
+// Option Storage
+
+// Save function
+
 function storeOptions() {
   function getProfile() {
-    return (profile = document.getElementById("profiles").value);
+    return (profile = profileList.value);
   }
   profile = getProfile();
   browser.storage.local.set({
@@ -111,8 +121,10 @@ function storeOptions() {
   });
 }
 
+// Update function
+
 function updateUI(restoredOptions) {
-  const selectList = document.getElementById("profiles");
+  const selectList = profileList;
   selectList.value = restoredOptions.profile;
 }
 
@@ -120,11 +132,11 @@ function onError(e) {
   console.error(e);
 }
 
+// Click event for profile list
+
 const gettingStoredOptions = browser.storage.local.get();
 gettingStoredOptions.then(updateUI, onError);
-document
-  .getElementById("profiles")
-  .addEventListener("click", async function () {
-    storeOptions();
-    setButtonState();
-  });
+profileList.addEventListener("click", async function () {
+  storeOptions();
+  setButtonState();
+});
