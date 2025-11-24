@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Website Feed",
+  "version": "1.0",
+  
+  "description": "Aims to create a way to browse the internet on user-determined pages sequentially.",
+  "homepage_url": "https://github.com/notmishi/website-feed-extension",
+  "icons": {
+    "48": "icons/icon-48.png"
+  },
+  
+  "permissions": ["activeTab"],
+  
+  "browser_action": {
+    "default_icon": "icons/icon-32.png",
+    "default_title": "Website Feed",
+    "default_popup": "popup/menu.html"
+  }
+}
