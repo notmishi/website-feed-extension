@@ -74,29 +74,30 @@ async function toggleCurrentSite(folderId, tab) {
 
 // Element init
 
-let btn = document.getElementById("button");
+let addButton = document.getElementById("addButton");
+let randomButton = document.getElementById("randomButton");
 let profileList = document.getElementById("profiles");
 
-setButtonState();
+setAddButtonState();
 
-// Button update function
+// AddButton update function
 
-async function setButtonState() {
+async function setAddButtonState() {
   let givenProfile = profileList.value;
   profileFolderId = await initProfileFolder(givenProfile);
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   profileFolderId = await initProfileFolder(givenProfile);
   const bookmarked = await currentSiteBookmarked(profileFolderId, tab);
   if (bookmarked) {
-    btn.textContent = "Remove site from list";
+    addButton.textContent = "Remove site from list";
   } else {
-    btn.textContent = "Add site to list";
+    addButton.textContent = "Add site to list";
   }
 }
 
-// Button click function
+// AddButton click function
 
-btn.addEventListener("click", async function () {
+addButton.addEventListener("click", async function () {
   let givenProfile = profileList.value;
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   profileFolderId = await initProfileFolder(givenProfile);
@@ -104,7 +105,71 @@ btn.addEventListener("click", async function () {
   if (!tab || !tab.url) return;
 
   await toggleCurrentSite(profileFolderId, tab);
-  setButtonState();
+  setAddButtonState();
+});
+
+// RandomButton function
+
+function shuffle(arr) {
+  arr = arr.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+async function openRandomFromProfile(profile) {
+  const folderId = await initProfileFolder(profile);
+  const children = await browser.bookmarks.getChildren(folderId);
+  const bookmarks = children.filter((child) => child.url);
+  if (bookmarks.length === 0) {
+    console.log("No bookmarks in this profile.");
+    return;
+  }
+
+  const storageKey = `randomBag_${profile}`;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  let bag = await browser.storage.local.get(storageKey);
+  bag = bag[storageKey] || {};
+
+  if (bag.date !== today || !Array.isArray(bag.order)) {
+    bag = {
+      date: today,
+      order: shuffle(bookmarks.map((b) => b.id)),
+      index: 0,
+    };
+  }
+
+  if (bag.index >= bag.order.length) {
+    bag.order = shuffle(bookmarks.map((b) => b.id));
+    bag.index = 0;
+  }
+
+  const nextId = bag.order[bag.index++];
+  await browser.storage.local.set({ [storageKey]: bag });
+
+  console.log(bag);
+
+  const target = bookmarks.find((b) => b.id === nextId);
+  if (!target) return;
+
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+
+  const bookmarked = currentSiteBookmarked(folderId, tab);
+  if (bookmarked) {
+    browser.tabs.update(tab.id, { url: target.url });
+  } else {
+    browser.tabs.create({ url: target.url });
+  }
+}
+
+// RandomButton click function
+
+randomButton.addEventListener("click", function () {
+  let givenProfile = profileList.value;
+  openRandomFromProfile(givenProfile);
 });
 
 // Option Storage
@@ -138,5 +203,5 @@ const gettingStoredOptions = browser.storage.local.get();
 gettingStoredOptions.then(updateUI, onError);
 profileList.addEventListener("click", async function () {
   storeOptions();
-  setButtonState();
+  setAddButtonState();
 });
