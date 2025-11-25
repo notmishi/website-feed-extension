@@ -5,9 +5,10 @@ Idea by [@astercontrol on tumblr](https://www.tumblr.com/astercontrol/8005894382
 ## Current Features:
 - Multiple profiles to save bookmark lists
 - Smart random page selector (avoids repetition)
+- Go to specific bookmark by index
+- Buttons to go to next and previous bookmark
 
 ## Todo:
-- Buttons to go to next and previous bookmark
 - UI to re-order bookmarks
 - Custom profile names
 - Ability to favorite specific sites to make them appear first

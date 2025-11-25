@@ -28,7 +28,7 @@ async function initProfileFolder(profile) {
 async function sortProfileFolders(parentId) {
   const children = await browser.bookmarks.getChildren(parentId);
   const profileFolders = children.filter(
-    (c) => c.type === "folder" && /^[1-4]$/.test(c.title),
+    (c) => c.type === "folder" && /^[1-4]$/.test(c.title), // this will probably be hostile to fix for custom profile names
   );
   const sorted = [...profileFolders].sort(
     (a, b) => Number(a.title) - Number(b.title),
@@ -76,16 +76,23 @@ async function toggleCurrentSite(folderId, tab) {
 
 let addButton = document.getElementById("addButton");
 let randomButton = document.getElementById("randomButton");
+let nextButton = document.getElementById("nextButton");
+let prevButton = document.getElementById("prevButton");
 let profileList = document.getElementById("profiles");
+let pageInfo = document.getElementById("pageInfo");
+let pageReq = document.getElementById("pageReq");
 
-setAddButtonState();
+reloadStuff();
+async function reloadStuff() {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  await setAddButtonState(tab);
+  await updatePageInfo(tab);
+}
 
 // AddButton update function
 
-async function setAddButtonState() {
+async function setAddButtonState(tab) {
   let givenProfile = profileList.value;
-  profileFolderId = await initProfileFolder(givenProfile);
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   profileFolderId = await initProfileFolder(givenProfile);
   const bookmarked = await currentSiteBookmarked(profileFolderId, tab);
   if (bookmarked) {
@@ -105,7 +112,8 @@ addButton.addEventListener("click", async function () {
   if (!tab || !tab.url) return;
 
   await toggleCurrentSite(profileFolderId, tab);
-  setAddButtonState();
+  setAddButtonState(tab);
+  updatePageInfo(tab);
 });
 
 // RandomButton function
@@ -163,14 +171,147 @@ async function openRandomFromProfile(profile) {
   } else {
     browser.tabs.create({ url: target.url });
   }
+
+  setAddButtonState(target);
+  updatePageInfo(target);
 }
 
 // RandomButton click function
 
-randomButton.addEventListener("click", function () {
+randomButton.addEventListener("click", async function () {
   let givenProfile = profileList.value;
-  openRandomFromProfile(givenProfile);
+  await openRandomFromProfile(givenProfile);
 });
+
+// Sequencing
+
+async function getPageIndex(folderId, tab) {
+  const bookmarked = await currentSiteBookmarked(folderId, tab);
+  if (!bookmarked) {
+    return "N/A";
+  }
+
+  const children = await browser.bookmarks.getChildren(folderId);
+  const bookmarks = children.filter((child) => child.url);
+
+  const pageIndex = bookmarks.findIndex((b) => b.url === tab.url);
+
+  return pageIndex;
+}
+
+async function getPageInfo(folderId, tab) {
+  const children = await browser.bookmarks.getChildren(folderId);
+  const bookmarks = children.filter((child) => child.url);
+
+  return `of ${bookmarks.length}`;
+}
+
+async function updatePageInfo(tab) {
+  let givenProfile = profileList.value;
+  let profileFolderId = await initProfileFolder(givenProfile);
+
+  let pageIndex = await getPageIndex(profileFolderId, tab);
+  if (pageIndex != "N/A") {
+    pageIndex++;
+  }
+  pageReq.value = pageIndex;
+  const pageLocation = await getPageInfo(profileFolderId, tab);
+  pageInfo.textContent = `${pageLocation}`;
+}
+
+prevButton.addEventListener("click", async function () {
+  let givenProfile = profileList.value;
+  let profileFolderId = await initProfileFolder(givenProfile);
+
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  const pageIndex = await getPageIndex(profileFolderId, tab);
+
+  const children = await browser.bookmarks.getChildren(profileFolderId);
+  const bookmarks = children.filter((item) => item.url);
+
+  let target;
+  if (pageIndex == "N/A") {
+    target = bookmarks[0];
+    await browser.tabs.update(tab.id, { url: target.url });
+  } else {
+    target = bookmarks[pageIndex - 1];
+    await browser.tabs.update(tab.id, { url: target.url });
+  }
+
+  setAddButtonState(target);
+  updatePageInfo(target);
+});
+
+nextButton.addEventListener("click", async function () {
+  let givenProfile = profileList.value;
+  let profileFolderId = await initProfileFolder(givenProfile);
+
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  const pageIndex = await getPageIndex(profileFolderId, tab);
+
+  const children = await browser.bookmarks.getChildren(profileFolderId);
+  const bookmarks = children.filter((item) => item.url);
+
+  let target;
+
+  if (pageIndex == "N/A") {
+    target = bookmarks[bookmarks.length - 1];
+    await browser.tabs.update(tab.id, { url: target.url });
+  } else {
+    target = bookmarks[pageIndex + 1];
+    await browser.tabs.update(tab.id, { url: target.url });
+  }
+
+  setAddButtonState(target);
+  await updatePageInfo(target);
+});
+
+// Page Goto Input
+
+async function goToBookmark(index, folderId) {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  const children = await browser.bookmarks.getChildren(folderId);
+  const bookmarks = children.filter((item) => item.url);
+  let target = bookmarks[index];
+  console.log(target.url);
+  await browser.tabs.update(tab.id, { url: target.url });
+  setAddButtonState(target);
+  await updatePageInfo(target);
+}
+
+document
+  .getElementById("form")
+  .addEventListener("submit", async function (event) {
+    event.preventDefault();
+    let givenProfile = profileList.value;
+    // let profileFolderId = await initProfileFolder(givenProfile);
+    profileFolderId = await initProfileFolder(givenProfile);
+
+    let givenValue = pageReq.value;
+
+    if (givenValue == "N/A") return;
+
+    if (isNaN(givenValue)) {
+      goToBookmark(0, profileFolderId);
+      return;
+    }
+
+    const children = await browser.bookmarks.getChildren(profileFolderId);
+    const bookmarks = children.filter((item) => item.url);
+
+    givenValue = Math.floor(givenValue);
+    if (givenValue < 1) {
+      goToBookmark(0, profileFolderId);
+      return;
+    }
+
+    if (givenValue > bookmarks.length) {
+      goToBookmark(bookmarks.length - 1, profileFolderId);
+      return;
+    }
+
+    goToBookmark(givenValue - 1, profileFolderId);
+  });
 
 // Option Storage
 
@@ -202,6 +343,8 @@ function onError(e) {
 const gettingStoredOptions = browser.storage.local.get();
 gettingStoredOptions.then(updateUI, onError);
 profileList.addEventListener("click", async function () {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   storeOptions();
-  setAddButtonState();
+  setAddButtonState(tab);
+  updatePageInfo(tab);
 });

@@ -3,6 +3,20 @@ body {
 	background-color: Canvas;
 	color: CanvasText;
 	color-scheme: light dark;
-	width: 200px;
+	width: 250px;
 	font-family: Verdana;
+}
+
+#addButton {
+	float: right;
+}
+
+.middle {
+	margin: auto;
+	width: 50%;
+}
+
+.spread {
+	display: flex;
+	justify-content: space-around;
 }
